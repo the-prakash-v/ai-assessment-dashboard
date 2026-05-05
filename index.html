@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>AI Maturity Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --ink:#0A1628;--navy:#112240;--panel:#162844;--ocean:#065A82;
+  --teal:#028090;--mint:#02C39A;--white:#fff;--lgray:#F4F6F8;
+  --border:rgba(255,255,255,.08);--gray:#78909C;
+  --l1:#5C6BC0;--l2:#0288D1;--l3:#00897B;--l4:#F4A83A;--l5:#2ECC71;
+  --font:'DM Sans',sans-serif;--mono:'DM Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--ink);color:#fff;min-height:100vh}
+
+/* TOPBAR */
+.topbar{background:rgba(10,22,40,.95);backdrop-filter:blur(12px);height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 2rem;position:sticky;top:0;z-index:100;border-bottom:1px solid var(--border)}
+.tb-brand{display:flex;align-items:center;gap:10px}
+.tb-dot{width:8px;height:8px;border-radius:50%;background:var(--mint);box-shadow:0 0 8px var(--mint)}
+.tb-title{font-size:14px;font-weight:600;color:#fff}
+.tb-right{display:flex;align-items:center;gap:12px}
+.refresh-btn{display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;background:rgba(2,195,154,.12);border:1px solid rgba(2,195,154,.3);color:var(--mint);font-size:12px;font-family:var(--mono);cursor:pointer;transition:all .2s}
+.refresh-btn:hover{background:rgba(2,195,154,.2)}
+.last-updated{font-family:var(--mono);font-size:11px;color:var(--gray)}
+
+.page{max-width:1200px;margin:0 auto;padding:2rem 1.5rem 4rem}
+
+/* LOADING */
+.loading{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:16px}
+.spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--mint);border-radius:50%;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-text{font-family:var(--mono);font-size:13px;color:var(--gray)}
+
+/* ERROR */
+.error-box{background:rgba(220,38,38,.1);border:1px solid rgba(220,38,38,.3);border-radius:12px;padding:1.5rem;text-align:center;color:#FCA5A5;font-size:14px;line-height:1.7}
+
+/* SECTION LABEL */
+.sec-label{font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--mint);text-transform:uppercase;margin-bottom:1rem}
+
+/* STAT CARDS */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:1.5rem}
+@media(max-width:700px){.stats-grid{grid-template-columns:repeat(2,1fr)}}
+.stat-card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:1.25rem 1.3rem;position:relative;overflow:hidden;transition:transform .2s}
+.stat-card:hover{transform:translateY(-2px)}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;border-radius:14px 14px 0 0}
+.sc-total::before{background:var(--mint)}
+.sc-pass::before{background:var(--l5)}
+.sc-fail::before{background:#EF4444}
+.sc-avg::before{background:var(--l4)}
+.stat-label{font-size:11px;color:var(--gray);font-family:var(--mono);margin-bottom:8px}
+.stat-value{font-size:32px;font-weight:600;font-family:var(--mono);line-height:1}
+.stat-sub{font-size:11px;color:var(--gray);margin-top:6px}
+.stat-card .stat-value.mint{color:var(--mint)}
+.stat-card .stat-value.green{color:var(--l5)}
+.stat-card .stat-value.red{color:#EF4444}
+.stat-card .stat-value.amber{color:var(--l4)}
+
+/* CHARTS ROW */
+.charts-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:1.5rem}
+@media(max-width:700px){.charts-row{grid-template-columns:1fr}}
+.chart-card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:1.25rem 1.3rem}
+.chart-title{font-size:13px;font-weight:500;margin-bottom:1rem;color:rgba(255,255,255,.8)}
+.chart-wrap{position:relative;height:220px}
+
+/* LEVEL BREAKDOWN */
+.level-breakdown{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:1.25rem 1.3rem;margin-bottom:1.5rem}
+.level-row{display:grid;grid-template-columns:100px 1fr 80px 80px 80px;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
+.level-row:last-child{border-bottom:none}
+.level-row.header{opacity:.5;font-size:10px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em}
+.lvl-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;font-family:var(--mono)}
+.bar-wrap{height:6px;background:rgba(255,255,255,.06);border-radius:4px;overflow:hidden}
+.bar-fill{height:100%;border-radius:4px;transition:width .6s ease}
+.level-stat{font-family:var(--mono);font-size:12px;text-align:right}
+
+/* TABLE */
+.table-card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:1.25rem 1.3rem;margin-bottom:1.5rem;overflow:hidden}
+.table-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}
+.search-box{padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:#fff;font-size:12px;font-family:var(--mono);outline:none;width:220px;transition:border-color .2s}
+.search-box:focus{border-color:var(--mint)}
+.search-box::placeholder{color:var(--gray)}
+.data-table{width:100%;border-collapse:collapse;font-size:12px}
+.data-table th{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--gray);padding:8px 10px;text-align:left;border-bottom:1px solid var(--border)}
+.data-table td{padding:10px 10px;border-bottom:1px solid rgba(255,255,255,.04);color:rgba(255,255,255,.8);vertical-align:middle}
+.data-table tr:last-child td{border-bottom:none}
+.data-table tr:hover td{background:rgba(255,255,255,.03)}
+.tag{display:inline-block;padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700;font-family:var(--mono)}
+.tag-pass{background:rgba(46,204,113,.15);color:#2ECC71}
+.tag-fail{background:rgba(239,68,68,.15);color:#EF4444}
+.score-pill{display:inline-block;padding:2px 8px;border-radius:5px;font-size:11px;font-family:var(--mono);font-weight:500}
+.empty-state{text-align:center;padding:3rem;color:var(--gray);font-size:13px}
+
+/* RESPONSIVE TABLE */
+.table-wrap{overflow-x:auto}
+@media(max-width:700px){
+  .level-row{grid-template-columns:80px 1fr 60px;}.level-row .level-stat:nth-child(4),.level-row .level-stat:nth-child(5){display:none}
+  .data-table th:nth-child(3),.data-table td:nth-child(3),.data-table th:nth-child(4),.data-table td:nth-child(4){display:none}
+}
+
+/* EMPTY */
+#dashboard{display:none}
+#loading-state{display:flex}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="tb-brand">
+    <div class="tb-dot"></div>
+    <span class="tb-title">AI Maturity Dashboard · App Mgmt & Production Support</span>
+  </div>
+  <div class="tb-right">
+    <span class="last-updated" id="last-updated"></span>
+    <button class="refresh-btn" onclick="loadData()">↻ Refresh</button>
+  </div>
+</div>
+
+<div class="page">
+
+  <!-- LOADING -->
+  <div id="loading-state" class="loading">
+    <div class="spinner"></div>
+    <div class="loading-text">Fetching assessment data…</div>
+  </div>
+
+  <!-- ERROR -->
+  <div id="error-state" style="display:none;padding:2rem 0">
+    <div class="error-box" id="error-msg"></div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div id="dashboard">
+
+    <!-- KPI CARDS -->
+    <div class="sec-label">Overview</div>
+    <div class="stats-grid">
+      <div class="stat-card sc-total">
+        <div class="stat-label">Total Submissions</div>
+        <div class="stat-value mint" id="kpi-total">0</div>
+        <div class="stat-sub">assessments completed</div>
+      </div>
+      <div class="stat-card sc-pass">
+        <div class="stat-label">Pass Rate</div>
+        <div class="stat-value green" id="kpi-pass">0%</div>
+        <div class="stat-sub" id="kpi-pass-count">0 passed</div>
+      </div>
+      <div class="stat-card sc-fail">
+        <div class="stat-label">Fail Rate</div>
+        <div class="stat-value red" id="kpi-fail">0%</div>
+        <div class="stat-sub" id="kpi-fail-count">0 need reassessment</div>
+      </div>
+      <div class="stat-card sc-avg">
+        <div class="stat-label">Avg Score</div>
+        <div class="stat-value amber" id="kpi-avg">0%</div>
+        <div class="stat-sub">across all levels</div>
+      </div>
+    </div>
+
+    <!-- CHARTS -->
+    <div class="charts-row">
+      <div class="chart-card">
+        <div class="chart-title">Pass vs Fail</div>
+        <div class="chart-wrap"><canvas id="chart-passfail"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Submissions by Level</div>
+        <div class="chart-wrap"><canvas id="chart-levels"></canvas></div>
+      </div>
+    </div>
+
+    <!-- LEVEL BREAKDOWN -->
+    <div class="sec-label">Level Breakdown</div>
+    <div class="level-breakdown">
+      <div class="level-row header">
+        <div>Level</div><div>Pass Rate</div><div>Submissions</div><div>Avg Score</div><div>Pass Count</div>
+      </div>
+      <div id="level-rows"></div>
+    </div>
+
+    <!-- DATA TABLE -->
+    <div class="sec-label">All Submissions</div>
+    <div class="table-card">
+      <div class="table-header">
+        <div style="font-size:13px;font-weight:500;color:rgba(255,255,255,.7)">Individual Results</div>
+        <input class="search-box" type="text" id="search" placeholder="Search name / role…" oninput="filterTable()">
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Role</th>
+              <th>Department</th>
+              <th>Self Level</th>
+              <th>Assessed Level</th>
+              <th>Score</th>
+              <th>Result</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody id="table-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /dashboard -->
+</div>
+
+<script>
+const SHEET_ID = "2PACX-1vSLqI6puxEItQqetSbtgFLUyMin7J_zFy266gnB9A8eN6d5Ns7vgQ8vJ5bVzB8T9ewTpqq0cd2eqo8G";
+const CSV_URL = `https://docs.google.com/spreadsheets/d/e/2PACX-1vSLqI6puxEItQqetSbtgFLUyMin7J_zFy266gnB9A8eN6d5Ns7vgQ8vJ5bVzB8T9ewTpqq0cd2eqo8G/pub?gid=0&single=true&output=csv`;
+const PROXY_URL = `https://corsproxy.io/?url=${encodeURIComponent(CSV_URL)}`;
+
+let allRows = [];
+let chartPF, chartLvl;
+
+const LEVEL_COLORS = {"Level 1":"#5C6BC0","Level 2":"#0288D1","Level 3":"#00897B","Level 4":"#F4A83A","Level 5":"#2ECC71"};
+const LEVEL_LABELS = {"Level 1":"🌱 Unaware","Level 2":"👀 Aware","Level 3":"🔬 Explorer","Level 4":"⚡ Practitioner","Level 5":"🏆 Champion"};
+
+function parseCSV(text){
+  const lines = text.trim().split("\n");
+  if(lines.length < 2) return [];
+  // skip header row
+  return lines.slice(1).map(line => {
+    const cols = line.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || line.split(",");
+    return {
+      timestamp: (cols[0]||"").replace(/"/g,"").trim(),
+      name:      (cols[1]||"").replace(/"/g,"").trim(),
+      role:      (cols[2]||"").replace(/"/g,"").trim(),
+      dept:      (cols[3]||"").replace(/"/g,"").trim(),
+      selfLevel: (cols[4]||"").replace(/"/g,"").trim(),
+      level:     (cols[5]||"").replace(/"/g,"").trim(),
+      scorePct:  parseInt((cols[6]||"0").replace(/[^0-9]/g,"")),
+      pass:      (cols[7]||"").replace(/"/g,"").trim().toUpperCase() === "PASS"
+    };
+  }).filter(r => r.name);
+}
+
+async function loadData(){
+  document.getElementById("loading-state").style.display = "flex";
+  document.getElementById("dashboard").style.display = "none";
+  document.getElementById("error-state").style.display = "none";
+
+  try {
+    let text;
+    try {
+      // Try direct first
+      const res = await fetch(CSV_URL + "&cachebust=" + Date.now());
+      if(!res.ok) throw new Error("direct failed");
+      text = await res.text();
+    } catch {
+      // Fallback to CORS proxy
+      const res2 = await fetch(PROXY_URL + "&cachebust=" + Date.now());
+      if(!res2.ok) throw new Error("Could not fetch data (HTTP " + res2.status + ")");
+      text = await res2.text();
+    }
+    allRows = parseCSV(text);
+
+    if(allRows.length === 0){
+      showError("No submission data found yet. Complete an assessment first, then refresh.");
+      return;
+    }
+
+    renderDashboard(allRows);
+    document.getElementById("last-updated").textContent = "Updated " + new Date().toLocaleTimeString();
+    document.getElementById("loading-state").style.display = "none";
+    document.getElementById("dashboard").style.display = "block";
+
+  } catch(e){
+    showError("Failed to load data: " + e.message + "<br><br>Make sure your Google Sheet is published to the web (File → Share → Publish to web).");
+  }
+}
+
+function showError(msg){
+  document.getElementById("loading-state").style.display = "none";
+  document.getElementById("error-state").style.display = "block";
+  document.getElementById("error-msg").innerHTML = "⚠️ " + msg;
+}
+
+function renderDashboard(rows){
+  const total = rows.length;
+  const passed = rows.filter(r=>r.pass).length;
+  const failed = total - passed;
+  const avgScore = Math.round(rows.reduce((s,r)=>s+r.scorePct,0)/total);
+
+  // KPIs
+  document.getElementById("kpi-total").textContent = total;
+  document.getElementById("kpi-pass").textContent = Math.round((passed/total)*100)+"%";
+  document.getElementById("kpi-pass-count").textContent = passed + " passed";
+  document.getElementById("kpi-fail").textContent = Math.round((failed/total)*100)+"%";
+  document.getElementById("kpi-fail-count").textContent = failed + " need reassessment";
+  document.getElementById("kpi-avg").textContent = avgScore+"%";
+
+  // Pass/Fail chart
+  if(chartPF) chartPF.destroy();
+  chartPF = new Chart(document.getElementById("chart-passfail"), {
+    type: "doughnut",
+    data: {
+      labels: ["Pass","Fail"],
+      datasets:[{data:[passed,failed],backgroundColor:["#2ECC71","#EF4444"],borderWidth:0,hoverOffset:4}]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:"bottom",labels:{color:"rgba(255,255,255,.6)",font:{family:"DM Mono",size:11},padding:16}},tooltip:{callbacks:{label:ctx=>` ${ctx.label}: ${ctx.raw} (${Math.round(ctx.raw/total*100)}%)`}}}
+    }
+  });
+
+  // Levels chart
+  const levelCounts = {};
+  ["Level 1","Level 2","Level 3","Level 4","Level 5"].forEach(l=>levelCounts[l]=0);
+  rows.forEach(r=>{ if(levelCounts[r.level]!==undefined) levelCounts[r.level]++; });
+
+  if(chartLvl) chartLvl.destroy();
+  chartLvl = new Chart(document.getElementById("chart-levels"), {
+    type: "bar",
+    data: {
+      labels: Object.keys(levelCounts).map(l=>"L"+l.replace("Level ","")),
+      datasets:[{
+        data: Object.values(levelCounts),
+        backgroundColor: Object.keys(levelCounts).map(l=>LEVEL_COLORS[l]+"CC"),
+        borderColor: Object.keys(levelCounts).map(l=>LEVEL_COLORS[l]),
+        borderWidth:1, borderRadius:6
+      }]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{title:ctx=>Object.keys(levelCounts)[ctx[0].dataIndex]}}},
+      scales:{
+        x:{grid:{color:"rgba(255,255,255,.04)"},ticks:{color:"rgba(255,255,255,.5)",font:{family:"DM Mono",size:11}}},
+        y:{grid:{color:"rgba(255,255,255,.04)"},ticks:{color:"rgba(255,255,255,.5)",font:{family:"DM Mono",size:11},stepSize:1}}
+      }
+    }
+  });
+
+  // Level breakdown table
+  let lh = "";
+  ["Level 1","Level 2","Level 3","Level 4","Level 5"].forEach(lvl => {
+    const lvlRows = rows.filter(r=>r.level===lvl);
+    if(!lvlRows.length) return;
+    const lvlPass = lvlRows.filter(r=>r.pass).length;
+    const lvlAvg = Math.round(lvlRows.reduce((s,r)=>s+r.scorePct,0)/lvlRows.length);
+    const passRate = Math.round((lvlPass/lvlRows.length)*100);
+    const col = LEVEL_COLORS[lvl];
+    lh += `<div class="level-row">
+      <div><span class="lvl-badge" style="background:${col}22;color:${col}">${lvl}</span></div>
+      <div>
+        <div style="margin-bottom:5px;font-size:11px;color:${col};font-family:var(--mono)">${passRate}%</div>
+        <div class="bar-wrap"><div class="bar-fill" style="width:${passRate}%;background:${col}"></div></div>
+      </div>
+      <div class="level-stat" style="color:rgba(255,255,255,.6)">${lvlRows.length}</div>
+      <div class="level-stat" style="color:${col}">${lvlAvg}%</div>
+      <div class="level-stat" style="color:#2ECC71">${lvlPass}</div>
+    </div>`;
+  });
+  document.getElementById("level-rows").innerHTML = lh || "<div class='empty-state'>No level data yet</div>";
+
+  // Table
+  renderTable(rows);
+}
+
+function renderTable(rows){
+  if(!rows.length){
+    document.getElementById("table-body").innerHTML = `<tr><td colspan="8"><div class="empty-state">No results found</div></td></tr>`;
+    return;
+  }
+  const sorted = [...rows].sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));
+  document.getElementById("table-body").innerHTML = sorted.map(r => {
+    const col = LEVEL_COLORS[r.level] || "#fff";
+    const scoreCol = r.scorePct >= 70 ? "#2ECC71" : r.scorePct >= 50 ? "#F4A83A" : "#EF4444";
+    return `<tr>
+      <td style="font-weight:500;color:#fff">${r.name||"—"}</td>
+      <td style="color:var(--gray)">${r.role||"—"}</td>
+      <td style="color:var(--gray)">${r.dept||"—"}</td>
+      <td style="color:var(--gray);font-family:var(--mono);font-size:11px">${r.selfLevel||"—"}</td>
+      <td><span style="color:${col};font-family:var(--mono);font-size:11px;font-weight:600">${r.level||"—"}</span></td>
+      <td><span class="score-pill" style="background:${scoreCol}18;color:${scoreCol}">${r.scorePct}%</span></td>
+      <td><span class="tag ${r.pass?"tag-pass":"tag-fail"}">${r.pass?"PASS":"FAIL"}</span></td>
+      <td style="color:var(--gray);font-size:11px;font-family:var(--mono);white-space:nowrap">${r.timestamp||"—"}</td>
+    </tr>`;
+  }).join("");
+}
+
+function filterTable(){
+  const q = document.getElementById("search").value.toLowerCase();
+  const filtered = allRows.filter(r =>
+    (r.name||"").toLowerCase().includes(q) ||
+    (r.role||"").toLowerCase().includes(q) ||
+    (r.dept||"").toLowerCase().includes(q)
+  );
+  renderTable(filtered);
+}
+
+// Init
+loadData();
+// Auto-refresh every 2 minutes
+setInterval(loadData, 120000);
+</script>
+</body>
+</html>
