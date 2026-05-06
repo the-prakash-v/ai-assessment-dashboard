@@ -6,6 +6,7 @@
 <title>AI Maturity Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root{
   --ink:#0A1628;--navy:#112240;--panel:#162844;--ocean:#065A82;
@@ -66,6 +67,9 @@ body{font-family:var(--font);background:var(--ink);color:#fff;min-height:100vh}
 .lvl-score-tag{font-size:9px;font-weight:700;font-family:var(--mono);padding:1px 5px;border-radius:3px}
 .not-taken{color:rgba(255,255,255,.15);font-family:var(--mono);font-size:12px}
 .highest-badge{display:inline-block;padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700;font-family:var(--mono)}
+.export-btn{display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;background:rgba(167,139,250,.12);border:1px solid rgba(167,139,250,.3);color:#A78BFA;font-size:12px;font-family:var(--mono);cursor:pointer;transition:all .2s;white-space:nowrap}
+.export-btn:hover{background:rgba(167,139,250,.25);transform:translateY(-1px)}
+.export-btn svg{flex-shrink:0}
 .stat-label{font-size:11px;color:var(--gray);font-family:var(--mono);margin-bottom:8px}
 .stat-value{font-size:32px;font-weight:600;font-family:var(--mono);line-height:1}
 .stat-sub{font-size:11px;color:var(--gray);margin-top:6px}
@@ -205,7 +209,13 @@ body{font-family:var(--font);background:var(--ink);color:#fff;min-height:100vh}
     <div class="table-card" style="margin-bottom:1.5rem">
       <div class="table-header">
         <div style="font-size:13px;font-weight:500;color:rgba(255,255,255,.7)">Score at Each Level per User</div>
-        <div style="font-size:11px;font-family:var(--mono);color:var(--gray)">— = not yet taken</div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="font-size:11px;font-family:var(--mono);color:var(--gray)">— = not yet taken</div>
+          <button class="export-btn" onclick="exportUserProgress()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export Excel
+          </button>
+        </div>
       </div>
       <div class="table-wrap">
         <table class="user-table">
@@ -258,7 +268,7 @@ body{font-family:var(--font);background:var(--ink);color:#fff;min-height:100vh}
 
 <script>
 const SHEET_ID = "2PACX-1vSLqI6puxEItQqetSbtgFLUyMin7J_zFy266gnB9A8eN6d5Ns7vgQ8vJ5bVzB8T9ewTpqq0cd2eqo8G";
-const CSV_URL = `https://docs.google.com/spreadsheets/d/e/2PACX-1vSLqI6puxEItQqetSbtgFLUyMin7J_zFy266gnB9A8eN6d5Ns7vgQ8vJ5bVzB8T9ewTpqq0cd2eqo8G/pub?gid=0&single=true&output=csv`;
+const CSV_URL = `https://docs.google.com/spreadsheets/d/e/${SHEET_ID}/pub?gid=0&single=true&output=csv`;
 const PROXY_URL = `https://corsproxy.io/?url=${encodeURIComponent(CSV_URL)}`;
 
 let allRows = [];
@@ -493,6 +503,51 @@ function renderUserProgress(rows){
   }).join("");
 
   document.getElementById("user-progress-body").innerHTML = html || `<tr><td colspan="9"><div class="empty-state">No data</div></td></tr>`;
+}
+
+function exportUserProgress(){
+  const LEVELS = ["Level 1","Level 2","Level 3","Level 4","Level 5"];
+  const userMap = {};
+  allRows.forEach(r => {
+    const key = r.name.trim();
+    if(!key) return;
+    if(!userMap[key]) userMap[key] = { role: r.role, dept: r.dept, levels: {} };
+    if(!userMap[key].levels[r.level] || r.scorePct > userMap[key].levels[r.level].score){
+      userMap[key].levels[r.level] = { score: r.scorePct, pass: r.pass };
+    }
+  });
+
+  // Build worksheet data
+  const headers = ["Name","Role","Department","L1 Unaware","L1 Result","L2 Aware","L2 Result","L3 Explorer","L3 Result","L4 Practitioner","L4 Result","L5 Champion","L5 Result","Highest Level Passed"];
+  const wsData = [headers];
+
+  Object.entries(userMap).forEach(([name, u]) => {
+    let highestPassed = null;
+    LEVELS.forEach(l => { if(u.levels[l] && u.levels[l].pass) highestPassed = l; });
+    const row = [name, u.role||"", u.dept||""];
+    LEVELS.forEach(l => {
+      const d = u.levels[l];
+      row.push(d ? d.score : "");
+      row.push(d ? (d.pass ? "PASS" : "FAIL") : "");
+    });
+    row.push(highestPassed || "None");
+    wsData.push(row);
+  });
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+  // Column widths
+  ws["!cols"] = [
+    {wch:25},{wch:20},{wch:22},
+    {wch:12},{wch:10},{wch:12},{wch:10},
+    {wch:12},{wch:10},{wch:16},{wch:10},
+    {wch:14},{wch:10},{wch:20}
+  ];
+
+  XLSX.utils.book_append_sheet(wb, ws, "User Progress");
+  const date = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `AI_Maturity_User_Progress_${date}.xlsx`);
 }
 
 function filterTable(){
