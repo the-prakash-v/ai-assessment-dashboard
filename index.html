@@ -51,6 +51,21 @@ body{font-family:var(--font);background:var(--ink);color:#fff;min-height:100vh}
 .sc-pass::before{background:var(--l5)}
 .sc-fail::before{background:#EF4444}
 .sc-avg::before{background:var(--l4)}
+.sc-users::before{background:#A78BFA}
+
+/* USER PROGRESS TABLE */
+.user-table{width:100%;border-collapse:collapse;font-size:12px}
+.user-table th{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--gray);padding:10px 12px;text-align:center;border-bottom:1px solid var(--border);white-space:nowrap}
+.user-table th:first-child{text-align:left}
+.user-table td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:middle;text-align:center}
+.user-table td:first-child{text-align:left}
+.user-table tr:last-child td{border-bottom:none}
+.user-table tr:hover td{background:rgba(255,255,255,.03)}
+.lvl-score{display:inline-flex;flex-direction:column;align-items:center;gap:2px}
+.lvl-score-val{font-family:var(--mono);font-size:12px;font-weight:600}
+.lvl-score-tag{font-size:9px;font-weight:700;font-family:var(--mono);padding:1px 5px;border-radius:3px}
+.not-taken{color:rgba(255,255,255,.15);font-family:var(--mono);font-size:12px}
+.highest-badge{display:inline-block;padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700;font-family:var(--mono)}
 .stat-label{font-size:11px;color:var(--gray);font-family:var(--mono);margin-bottom:8px}
 .stat-value{font-size:32px;font-weight:600;font-family:var(--mono);line-height:1}
 .stat-sub{font-size:11px;color:var(--gray);margin-top:6px}
@@ -136,11 +151,16 @@ body{font-family:var(--font);background:var(--ink);color:#fff;min-height:100vh}
 
     <!-- KPI CARDS -->
     <div class="sec-label">Overview</div>
-    <div class="stats-grid">
+    <div class="stats-grid" style="grid-template-columns:repeat(5,1fr)">
       <div class="stat-card sc-total">
         <div class="stat-label">Total Submissions</div>
         <div class="stat-value mint" id="kpi-total">0</div>
         <div class="stat-sub">assessments completed</div>
+      </div>
+      <div class="stat-card sc-users">
+        <div class="stat-label">Distinct Users</div>
+        <div class="stat-value" style="color:#A78BFA" id="kpi-users">0</div>
+        <div class="stat-sub" id="kpi-users-sub">unique participants</div>
       </div>
       <div class="stat-card sc-pass">
         <div class="stat-label">Pass Rate</div>
@@ -180,6 +200,33 @@ body{font-family:var(--font);background:var(--ink);color:#fff;min-height:100vh}
       <div id="level-rows"></div>
     </div>
 
+    <!-- USER PROGRESS TABLE -->
+    <div class="sec-label">User Progress by Level</div>
+    <div class="table-card" style="margin-bottom:1.5rem">
+      <div class="table-header">
+        <div style="font-size:13px;font-weight:500;color:rgba(255,255,255,.7)">Score at Each Level per User</div>
+        <div style="font-size:11px;font-family:var(--mono);color:var(--gray)">— = not yet taken</div>
+      </div>
+      <div class="table-wrap">
+        <table class="user-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Role</th>
+              <th>Department</th>
+              <th style="color:var(--l1)">L1 Unaware</th>
+              <th style="color:var(--l2)">L2 Aware</th>
+              <th style="color:var(--l3)">L3 Explorer</th>
+              <th style="color:var(--l4)">L4 Practitioner</th>
+              <th style="color:var(--l5)">L5 Champion</th>
+              <th>Highest Level</th>
+            </tr>
+          </thead>
+          <tbody id="user-progress-body"></tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- DATA TABLE -->
     <div class="sec-label">All Submissions</div>
     <div class="table-card">
@@ -211,7 +258,7 @@ body{font-family:var(--font);background:var(--ink);color:#fff;min-height:100vh}
 
 <script>
 const SHEET_ID = "2PACX-1vSLqI6puxEItQqetSbtgFLUyMin7J_zFy266gnB9A8eN6d5Ns7vgQ8vJ5bVzB8T9ewTpqq0cd2eqo8G";
-const CSV_URL = `https://docs.google.com/spreadsheets/d/e/${SHEET_ID}/pub?gid=0&single=true&output=csv`;
+const CSV_URL = `https://docs.google.com/spreadsheets/d/e/2PACX-1vSLqI6puxEItQqetSbtgFLUyMin7J_zFy266gnB9A8eN6d5Ns7vgQ8vJ5bVzB8T9ewTpqq0cd2eqo8G/pub?gid=0&single=true&output=csv`;
 const PROXY_URL = `https://corsproxy.io/?url=${encodeURIComponent(CSV_URL)}`;
 
 let allRows = [];
@@ -300,7 +347,10 @@ function renderDashboard(rows){
   const avgScore = Math.round(rows.reduce((s,r)=>s+r.scorePct,0)/total);
 
   // KPIs
+  const distinctUsers = [...new Set(rows.map(r=>r.name.trim()))].filter(Boolean);
   document.getElementById("kpi-total").textContent = total;
+  document.getElementById("kpi-users").textContent = distinctUsers.length;
+  document.getElementById("kpi-users-sub").textContent = "unique participants";
   document.getElementById("kpi-pass").textContent = Math.round((passed/total)*100)+"%";
   document.getElementById("kpi-pass-count").textContent = passed + " passed";
   document.getElementById("kpi-fail").textContent = Math.round((failed/total)*100)+"%";
@@ -372,6 +422,7 @@ function renderDashboard(rows){
 
   // Table
   renderTable(rows);
+  renderUserProgress(rows);
 }
 
 function renderTable(rows){
@@ -394,6 +445,54 @@ function renderTable(rows){
       <td style="color:var(--gray);font-size:11px;font-family:var(--mono);white-space:nowrap">${r.timestamp||"—"}</td>
     </tr>`;
   }).join("");
+}
+
+function renderUserProgress(rows){
+  const LEVELS = ["Level 1","Level 2","Level 3","Level 4","Level 5"];
+  const LC = {"Level 1":"var(--l1)","Level 2":"var(--l2)","Level 3":"var(--l3)","Level 4":"var(--l4)","Level 5":"var(--l5)"};
+
+  // Build user map: name -> { role, dept, levels: { "Level 1": {score, pass}, ... } }
+  const userMap = {};
+  rows.forEach(r => {
+    const key = r.name.trim();
+    if(!key) return;
+    if(!userMap[key]) userMap[key] = { role: r.role, dept: r.dept, levels: {} };
+    // Keep best score per level per user
+    if(!userMap[key].levels[r.level] || r.scorePct > userMap[key].levels[r.level].score){
+      userMap[key].levels[r.level] = { score: r.scorePct, pass: r.pass };
+    }
+  });
+
+  const html = Object.entries(userMap).map(([name, u]) => {
+    // Find highest level passed
+    let highestPassed = null;
+    LEVELS.forEach(l => { if(u.levels[l] && u.levels[l].pass) highestPassed = l; });
+    const hcol = highestPassed ? LC[highestPassed] : "var(--gray)";
+
+    const levelCells = LEVELS.map(l => {
+      const d = u.levels[l];
+      if(!d) return `<td><span class="not-taken">—</span></td>`;
+      const scoreCol = d.score >= 70 ? "#2ECC71" : d.score >= 50 ? "#F4A83A" : "#EF4444";
+      const tagBg = d.pass ? "rgba(46,204,113,.15)" : "rgba(239,68,68,.15)";
+      const tagCol = d.pass ? "#2ECC71" : "#EF4444";
+      return `<td>
+        <div class="lvl-score">
+          <span class="lvl-score-val" style="color:${scoreCol}">${d.score}%</span>
+          <span class="lvl-score-tag" style="background:${tagBg};color:${tagCol}">${d.pass?"PASS":"FAIL"}</span>
+        </div>
+      </td>`;
+    }).join("");
+
+    return `<tr>
+      <td style="font-weight:600;color:#fff;white-space:nowrap">${name}</td>
+      <td style="color:var(--gray);font-size:11px">${u.role||"—"}</td>
+      <td style="color:var(--gray);font-size:11px">${u.dept||"—"}</td>
+      ${levelCells}
+      <td><span class="highest-badge" style="background:${hcol}22;color:${hcol}">${highestPassed||"None"}</span></td>
+    </tr>`;
+  }).join("");
+
+  document.getElementById("user-progress-body").innerHTML = html || `<tr><td colspan="9"><div class="empty-state">No data</div></td></tr>`;
 }
 
 function filterTable(){
