@@ -87,7 +87,7 @@ body{font-family:var(--font);background:var(--ink);color:#fff;min-height:100vh}
 
 /* LEVEL BREAKDOWN */
 .level-breakdown{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:1.25rem 1.3rem;margin-bottom:1.5rem}
-.level-row{display:grid;grid-template-columns:100px 1fr 80px 80px 80px;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
+.level-row{display:grid;grid-template-columns:100px 1fr 80px 80px 80px 100px 100px;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
 .level-row:last-child{border-bottom:none}
 .level-row.header{opacity:.5;font-size:10px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em}
 .lvl-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;font-family:var(--mono)}
@@ -115,7 +115,7 @@ body{font-family:var(--font);background:var(--ink);color:#fff;min-height:100vh}
 /* RESPONSIVE TABLE */
 .table-wrap{overflow-x:auto}
 @media(max-width:700px){
-  .level-row{grid-template-columns:80px 1fr 60px;}.level-row .level-stat:nth-child(4),.level-row .level-stat:nth-child(5){display:none}
+  .level-row{grid-template-columns:80px 1fr 60px;}.level-row .level-stat:nth-child(4),.level-row .level-stat:nth-child(5),.level-row .level-stat:nth-child(6),.level-row .level-stat:nth-child(7){display:none}
   .data-table th:nth-child(3),.data-table td:nth-child(3),.data-table th:nth-child(4),.data-table td:nth-child(4){display:none}
 }
 
@@ -199,7 +199,7 @@ body{font-family:var(--font);background:var(--ink);color:#fff;min-height:100vh}
     <div class="sec-label">Level Breakdown</div>
     <div class="level-breakdown">
       <div class="level-row header">
-        <div>Level</div><div>Pass Rate</div><div>Submissions</div><div>Avg Score</div><div>Pass Count</div>
+        <div>Level</div><div>Pass Rate</div><div>Submissions</div><div>Avg Score</div><div>Pass Count</div><div>% Users Attempted</div><div>% Users Passed</div>
       </div>
       <div id="level-rows"></div>
     </div>
@@ -409,6 +409,7 @@ function renderDashboard(rows){
   });
 
   // Level breakdown table
+  const totalDistinctUsers = [...new Set(rows.map(r=>r.name.trim()))].filter(Boolean).length;
   let lh = "";
   ["Level 1","Level 2","Level 3","Level 4","Level 5"].forEach(lvl => {
     const lvlRows = rows.filter(r=>r.level===lvl);
@@ -417,6 +418,14 @@ function renderDashboard(rows){
     const lvlAvg = Math.round(lvlRows.reduce((s,r)=>s+r.scorePct,0)/lvlRows.length);
     const passRate = Math.round((lvlPass/lvlRows.length)*100);
     const col = LEVEL_COLORS[lvl];
+
+    // Distinct users who attempted this level
+    const usersAttempted = [...new Set(lvlRows.map(r=>r.name.trim()))].filter(Boolean).length;
+    // Distinct users who passed this level (at least once)
+    const usersPassed = [...new Set(lvlRows.filter(r=>r.pass).map(r=>r.name.trim()))].filter(Boolean).length;
+    const pctAttempted = totalDistinctUsers ? Math.round((usersAttempted/totalDistinctUsers)*100) : 0;
+    const pctPassed = totalDistinctUsers ? Math.round((usersPassed/totalDistinctUsers)*100) : 0;
+
     lh += `<div class="level-row">
       <div><span class="lvl-badge" style="background:${col}22;color:${col}">${lvl}</span></div>
       <div>
@@ -426,6 +435,14 @@ function renderDashboard(rows){
       <div class="level-stat" style="color:rgba(255,255,255,.6)">${lvlRows.length}</div>
       <div class="level-stat" style="color:${col}">${lvlAvg}%</div>
       <div class="level-stat" style="color:#2ECC71">${lvlPass}</div>
+      <div class="level-stat">
+        <span style="color:rgba(255,255,255,.7);font-family:var(--mono);font-size:12px">${pctAttempted}%</span>
+        <span style="color:var(--gray);font-size:10px;display:block;font-family:var(--mono)">${usersAttempted}/${totalDistinctUsers}</span>
+      </div>
+      <div class="level-stat">
+        <span style="color:#2ECC71;font-family:var(--mono);font-size:12px">${pctPassed}%</span>
+        <span style="color:var(--gray);font-size:10px;display:block;font-family:var(--mono)">${usersPassed}/${totalDistinctUsers}</span>
+      </div>
     </div>`;
   });
   document.getElementById("level-rows").innerHTML = lh || "<div class='empty-state'>No level data yet</div>";
