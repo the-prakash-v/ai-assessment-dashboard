@@ -438,7 +438,7 @@ function renderDashboard(rows){
     // Distinct users who passed this level (at least once)
     const usersPassed = [...new Set(lvlRows.filter(r=>r.pass).map(r=>r.name.trim()))].filter(Boolean).length;
     const pctAttempted = totalDistinctUsers ? Math.round((usersAttempted/totalDistinctUsers)*100) : 0;
-    const pctPassed = totalDistinctUsers ? Math.round((usersPassed/totalDistinctUsers)*100) : 0;
+    const pctPassed = usersAttempted ? Math.round((usersPassed/usersAttempted)*100) : 0;
 
     lh += `<tr>
       <td><span class="lvl-badge" style="background:${col}22;color:${col}">${lvl}</span></td>
@@ -455,7 +455,7 @@ function renderDashboard(rows){
       </td>
       <td class="level-stat">
         <span style="color:#2ECC71">${pctPassed}%</span>
-        <span style="color:var(--gray);font-size:10px;display:block">${usersPassed}/${totalDistinctUsers}</span>
+        <span style="color:var(--gray);font-size:10px;display:block">${usersPassed}/${usersAttempted}</span>
       </td>
     </tr>`;
   });
